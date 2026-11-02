@@ -1,5 +1,7 @@
 # 用 LangGraph + Microsoft Trace 学习 Agent
 
+📱 **手机阅读：[学习报告：Python / TypeScript 核心代码对照](LEARNING_REPORT.md)**
+
 TypeScript 编排版本见 [ts-demo/README.md](ts-demo/README.md)，支持本地 Ollama `qwen3.5:9b`，通过 Python 子进程调用真实 Microsoft Trace。
 
 这个小项目演示：Agent 做一次尝试，环境检查结果，失败后根据反馈调整策略，再尝试。
