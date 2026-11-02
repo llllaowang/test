@@ -1,5 +1,7 @@
 # TypeScript LangGraph + Langfuse + Ollama
 
+📱 [当前 TS 代码学习报告：核心代码与逐步讲解](LEARNING_REPORT.md)
+
 本版本已从 Microsoft Trace 迁移到 **Langfuse 官方 TS SDK**。它是纯 TS 应用，不需要 Python、Trace Node、句柄或子进程。
 父目录 Python demo 仍使用 Microsoft Trace，两个版本现在演示不同的集成方式。
 
