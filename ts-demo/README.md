@@ -1,99 +1,92 @@
-# TypeScript LangGraph + Microsoft Trace + 本地 Qwen
+# TypeScript LangGraph + Langfuse + Ollama
 
-这是前一个 Python demo 的 TypeScript 编排版本，任务相同：根据失败反馈修正运费参数。
-
-**技术边界：** LangGraph 的状态、节点、条件路由、重试与结果输出都写在 TypeScript 中。
-Microsoft Trace 使用官方 Python `trace-opt`，通过一个子进程桥接调用。
-这不是纯 TS 的 Trace 移植，也没有手写一个优化器来代替真实 Trace。
-模型使用你本地 Ollama 的 `qwen3.5:9b`，不需要 API Key。
+本版本已从 Microsoft Trace 迁移到 **Langfuse 官方 TS SDK**。它是纯 TS 应用，不需要 Python、Trace Node、句柄或子进程。
+父目录 Python demo 仍使用 Microsoft Trace，两个版本现在演示不同的集成方式。
 
 ## 运行
 
-本机父目录已经装好了 Python 虚拟环境，进入本文件夹：
+要求 Node.js 22+；真实模型模式要求本地 Ollama 已安装 `qwen3.5:9b`。
 
 ```powershell
 cd ts-demo
-npm.cmd install
+npm.cmd ci
 npm.cmd run demo
 npm.cmd run demo:ollama
 ```
 
-- `demo` 使用规则编写的教学假模型，便于稳定学习。
-- `demo:ollama` 使用真实 Qwen，阅读 Trace 计算图并生成参数建议。
+默认模式采用教学规则更新参数。`demo:ollama` 直接通过 HTTP 请求本地 Qwen，生成费率建议。
 
-你也可以自定义：
+## 接入 Langfuse
+
+在 Langfuse Cloud 或自部署实例创建项目，获取项目的 public / secret key。
 
 ```powershell
-npm.cmd run demo -- --ollama --model qwen3.5:9b --base-url http://localhost:11434 --max-attempts 3
+Copy-Item .env.example .env
+# 编辑 .env，填写自己的项目凭据和项目所在区域的地址。
+npm.cmd run demo:ollama
+```
+
+`.env` 内容：
+
+```dotenv
+LANGFUSE_PUBLIC_KEY=你的项目公钥
+LANGFUSE_SECRET_KEY=你的项目密钥
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+```
+
+请按项目实际部署区域修改地址；自部署可使用自己的服务地址。
+没有配置密钥时不会初始化导出器，业务照常运行并保存本地记录。
+只配置其中一个 key 时会报错，避免误以为已成功接入。
+启用后，运行中的输入、输出、反馈及模型调用会发送到指定 Langfuse 项目。
+启动时显示“已启用”表示导出器已配置，仍需在 Langfuse UI 确认数据到达；网络或凭据错误由 SDK 报告。
+
+## Langfuse 记录什么
+
+```text
+shipping-agent（整次工作流）
+  ├─ act：费率、重量、报价
+  ├─ evaluate：标准答案、实际报价、是否通过
+  ├─ optimize：失败信息、新费率或错误
+  │    └─ ollama.suggest-rate（generation）
+  │         模型、提示词、响应、耗时、输入/输出 token 数
+  └─ 下一轮 act / evaluate ...
+```
+
+OpenTelemetry 保存父子上下文，`LangfuseSpanProcessor` 导出观察。
+CLI 在退出前调用 `shutdown()` 刷新记录。教学规则模式没有真实模型调用，因此不会创建 generation。
+
+**Langfuse 在本例中负责观测，不会代替 OptoPrime 自动反向传播或修改参数。**
+参数调整是 `optimize` 节点自己调用 Qwen，然后显式写回 LangGraph 的 `rate` 状态。
+Langfuse 中记录的 `passed` 是评估输出，本例没有另外创建独立的 Langfuse Score 实体。
+
+## 核心代码导航
+
+- [demo.ts](src/demo.ts)：状态、行动、评估、参数更新和条件路由；保留中文变量注释。
+- [ollama-client.ts](src/ollama-client.ts)：原生 fetch 调用 Qwen，记录 generation，校验模型 JSON。
+- [telemetry.ts](src/telemetry.ts)：加载 .env，初始化 Langfuse OpenTelemetry 导出。
+- [main.ts](src/main.ts)：CLI 参数、结果保存和退出刷新。
+- [demo.test.ts](src/demo.test.ts)：业务和内存观测验证，不访问 Langfuse 云端。
+
+已验证：类型检查、五个测试（含真实 SDK 向本地测试接收器导出）、本地 Qwen 参数修正；依赖审计无漏洞。
+尚未验证你的 Langfuse 云端项目接收，因为当前未配置项目凭据。
+OpenTelemetry 的兼容版本及 overrides 已固定在 package.json / package-lock.json，安装请使用 `npm ci`。
+
+运费任务：`quote = rate × weight + 5`。初始 rate=1，2kg 报价为 7，目标为 11。
+默认教学模式会将 rate 更新为 3；随后用 4kg 检查报价是否为 17。
+模型建议无效或请求失败时记录 ERROR，保留旧费率继续有限次数重试。
+这不是训练 Qwen 权重，也尚未实现跨运行保存策略或长期记忆。
+
+```powershell
+npm.cmd run demo -- --ollama --model qwen3.5:9b --weight 2 --expected 11 --initial-rate 1 --max-attempts 3
 npm.cmd run check
 npm.cmd test
 ```
 
-要求 Node.js 22+，以及安装父目录 `requirements.txt` 的 Python 环境。
-代码自动选择父目录 `.venv/Scripts/python.exe`。其他环境通过变量指定：
-
-```powershell
-$env:PYTHON_PATH = '你的 Python 可执行文件绝对路径'
-npm.cmd run demo:ollama
-```
-
-请保留整个项目结构：`trace_worker.py` 会导入父目录 `demo.py` 中已经验证的模型适配器。
-如果换机器，先在父目录创建虚拟环境并安装 `requirements.txt`。
-
-## 发生了什么
-
-```mermaid
-flowchart LR
-    A[TS act：请求报价] --> B[TS evaluate：检查结果]
-    B -->|失败且未达到上限| C[TS optimize：发送反馈]
-    C --> D[Python Trace：backward + step]
-    D --> E[本地 Qwen：参数建议]
-    E --> A
-    B -->|通过或达到上限| F[结束]
-```
-
-运费公式是 `rate × weight + 5`。初始 `rate=1`，2kg 得到 7，但期望为 11。
-Trace 把失败反馈传回可训练的 rate，优化器请求模型建议；成功时 rate 变成 3。
-最后检查未参与优化的 4kg 样例，期望报价为 17。
-
-关键代码按顺序读：
-
-1. `src/demo.ts`：看 `Annotation.Root` 如何描述状态，以及三个节点和条件边如何组成循环。
-2. `src/trace-client.ts`：看 TypeScript 如何启动 Python 子进程，用带 id 的 JSON Lines 匹配请求和响应。
-3. `trace_worker.py`：看真正的 `node(trainable=True)`、`backward` 和 `step`。
-4. `src/main.ts`：看运行参数、逐步日志和结果文件。
-
-## 为什么需要 handle
-
-Trace 需要原始计算依赖链：`rate → multiply → add → quote`。
-不能把 Python Node 直接通过 JSON 传给 TS，也不能只传数值后重新包装。
-所以 Python 保留真正的 quote Node，TS 状态只保存 `{ handle, value, rate }`。
-调用优化时传回 handle，worker 找到原始 Node 后传播反馈。
-
-每次运行独享一个 worker；结束后关闭进程。handle 仅在该 worker 本次运行期间有效，
-不能作为可跨进程恢复的 checkpoint。这里的参数更新是单个任务内在线调整，尚未实现跨运行保存策略。
-
-## 查看结果与做实验
-
-运行后，当前文件夹的 `artifacts/` 中会生成：
-
-- `run.json`：每轮参数、报价、通过情况和新样例结果。
-- `optimizer.json`：真实 Trace 发给模型的提示与返回建议。
-- `graph.mmd`：TypeScript LangGraph 的控制流图。
-
-先用默认教学模式观察 7 → 11，再用 Ollama 比较返回建议。
-真实模型可能给出无效建议，程序会继续检查；达到上限后如实报告失败。
-可运行 `npm.cmd run demo -- --max-attempts 1`，观察为什么第一轮失败后直接结束。
-
-默认模式的模型只是按规则解方程，不能把它的稳定输出视作模型学习效果。
-Ollama 模式才由 Qwen 生成建议；即使单个新样例通过，也不足以证明真实业务的泛化能力。
-
-本机验证结果：TypeScript 类型检查通过，4 个集成测试通过。
-实际调用 `qwen3.5:9b` 时第 3 轮成功（报价 7 → 7 → 11），4kg 新样例为 17。
-本次真实模型运行记录已保存在 `artifacts/`，后续运行会覆盖这些记录。
+本地结果保存在 `artifacts/run.json`、`optimizer.json`、`graph.mmd`，每次运行会覆盖。
+`optimizer.json` 现在保存应用层建议记录，不再是 OptoPrime 的执行图提示。
 
 ## 官方资料
 
-- [LangGraph.js StateGraph](https://langchain-ai.github.io/langgraphjs/reference/classes/langgraph.StateGraph.html)
-- [Microsoft Trace 官方 Python 项目](https://github.com/microsoft/Trace)
+- [Langfuse TS SDK 与 OpenTelemetry 初始化](https://langfuse.com/docs/observability/sdk/overview)
+- [Langfuse 观测入门](https://langfuse.com/docs/observability/get-started)
 - [Ollama Chat API](https://docs.ollama.com/api/chat)

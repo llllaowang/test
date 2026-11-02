@@ -1,5 +1,7 @@
 # LangGraph + Trace 学习报告
 
+> **版本说明：** 本文记录最初的 Microsoft Trace 对照实现。当前 `ts-demo` 已迁移到纯 TS 的 Langfuse 观测，原 TS Trace 桥接代码已移除；第 6 节及相关 TS 验证结果仅作历史学习记录。最新实现与配置请看 [TS Langfuse 教程](ts-demo/README.md)。Python 示例保持原来的 Microsoft Trace 实现。
+
 > 面向 AI Agent 入门 · Python / TypeScript 对照 · 2026-11-02
 >
 > 阅读约 15 分钟。手机上先看第 1～4 节，再按兴趣读代码。
@@ -408,8 +410,8 @@ npm.cmd run demo:ollama
 
 - [Python 完整示例](demo.py)
 - [TS LangGraph 流程](ts-demo/src/demo.ts)
-- [TS 子进程客户端](ts-demo/src/trace-client.ts)
-- [Python Trace worker](ts-demo/trace_worker.py)
+- [历史 TS 子进程客户端](https://github.com/llllaowang/test/blob/d063272/ts-demo/src/trace-client.ts)
+- [历史 Python Trace worker](https://github.com/llllaowang/test/blob/d063272/ts-demo/trace_worker.py)
 - [Python 运行教程](README.md)
 - [TS 运行教程](ts-demo/README.md)
 

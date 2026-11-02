@@ -2,7 +2,7 @@
 
 📱 **手机阅读：[学习报告：Python / TypeScript 核心代码对照](LEARNING_REPORT.md)**
 
-TypeScript 编排版本见 [ts-demo/README.md](ts-demo/README.md)，支持本地 Ollama `qwen3.5:9b`，通过 Python 子进程调用真实 Microsoft Trace。
+TypeScript 版本已迁移为 **LangGraph + Langfuse + Ollama**，见 [ts-demo/README.md](ts-demo/README.md)。它是纯 TS 实现，无需 Python 子进程；本目录 Python 示例继续使用 Microsoft Trace。
 
 这个小项目演示：Agent 做一次尝试，环境检查结果，失败后根据反馈调整策略，再尝试。
 这里的 Trace 指 [Microsoft Trace](https://github.com/microsoft/Trace)，安装名是 `trace-opt`，导入名是 `opto`。
